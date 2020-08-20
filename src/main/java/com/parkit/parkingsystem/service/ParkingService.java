@@ -9,6 +9,9 @@ import com.parkit.parkingsystem.util.InputReaderUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 public class ParkingService {
@@ -19,7 +22,7 @@ public class ParkingService {
 
     private InputReaderUtil inputReaderUtil;
     private ParkingSpotDAO parkingSpotDAO;
-    private  TicketDAO ticketDAO;
+    private TicketDAO ticketDAO;
 
     public ParkingService(InputReaderUtil inputReaderUtil, ParkingSpotDAO parkingSpotDAO, TicketDAO ticketDAO){
         this.inputReaderUtil = inputReaderUtil;
@@ -35,8 +38,10 @@ public class ParkingService {
                 parkingSpot.setAvailable(false);
                 parkingSpotDAO.updateParking(parkingSpot);//allot this parking space and mark it's availability as false
 
+
                 Date inTime = new Date();
                 Ticket ticket = new Ticket();
+                            
                 //ID, PARKING_NUMBER, VEHICLE_REG_NUMBER, PRICE, IN_TIME, OUT_TIME)
                 //ticket.setId(ticketID);
                 ticket.setParkingSpot(parkingSpot);
@@ -44,6 +49,11 @@ public class ParkingService {
                 ticket.setPrice(0);
                 ticket.setInTime(inTime);
                 ticket.setOutTime(null);
+
+                /*if(ticketDAO.getTicket(vehicleRegNumber)!=null) {
+                	System.out.println("Welcome back! As a recurring user of our parking lot, you'll benefit from a 5% discount");
+                }*/
+                
                 ticketDAO.saveTicket(ticket);
                 System.out.println("Generated Ticket and saved in DB");
                 System.out.println("Please park your vehicle in spot number:"+parkingSpot.getId());
@@ -77,7 +87,7 @@ public class ParkingService {
         }
         return parkingSpot;
     }
-
+   
     private ParkingType getVehichleType(){
         System.out.println("Please select vehicle type from menu");
         System.out.println("1 CAR");
@@ -96,22 +106,35 @@ public class ParkingService {
             }
         }
     }
-
+    
     public void processExitingVehicle() {
         try{
             String vehicleRegNumber = getVehichleRegNumber();
             Ticket ticket = ticketDAO.getTicket(vehicleRegNumber);
+            String reduction = null;
+
+            if((ticketDAO.getTicketReccurent(vehicleRegNumber)!=null))  {
+           // if((ticketDAO.getTicketReccurent(vehicleRegNumber)==true)){
+                System.out.println("Welcome back! As a recurring user of our parking lot, you'll benefit from a 5% discount");
+                    reduction = vehicleRegNumber;
+            }
             Date outTime = new Date();
             ticket.setOutTime(outTime);
-            fareCalculatorService.calculateFare(ticket);
+
+            System.out.println(ticket.getInTime());
+            System.out.println(ticket.getOutTime());
+
+            fareCalculatorService.calculateFare(ticket,reduction);
             if(ticketDAO.updateTicket(ticket)) {
                 ParkingSpot parkingSpot = ticket.getParkingSpot();
                 parkingSpot.setAvailable(true);
                 parkingSpotDAO.updateParking(parkingSpot);
-                System.out.println("Please pay the parking fare:" + ticket.getPrice());
-                System.out.println("Recorded out-time for vehicle number:" + ticket.getVehicleRegNumber() + " is:" + outTime);
+              //System.out.println("Please pay the parking fare:" + ticket.getPrice());
+                System.out.printf("Please pay the parking fare: %.2f\n", ticket.getPrice());
+                System.out.println("Recorded out-time for vehicle number:" + ticket.getVehicleRegNumber() + " is:" + outTime+ " "+ticket.getDuration() );
+
             }else{
-                System.out.println("Unable to update ticket information. Error occurred");
+                  System.out.println("Unable to update ticket information. Error occurred");
             }
         }catch(Exception e){
             logger.error("Unable to process exiting vehicle",e);
